@@ -1,101 +1,83 @@
 import datetime
-import random
 import os
-
-import altair as alt
-import numpy as np
 import pandas as pd
 import streamlit as st
+import altair as alt
 
-# Show app title and description.
-st.set_page_config(page_title="Support tickets", page_icon="🎫")
-st.title("🎫 Support tickets")
+# Set the page configuration
+st.set_page_config(page_title="Agendamento de Entrega", page_icon="📅")
+st.title("📅 Agendamento de Entrega")
 st.write(
     """
-    This app shows how you can build an internal tool in Streamlit. Here, we are 
-    implementing a support ticket workflow. The user can create a ticket, edit 
-    existing tickets, and view some statistics.
+    Regras gerais para entrega:\n
+•	Não acataremos divergências de preços e/ou quantidades (nestes casos emitiremos a NF devolução parcial), ou de prazo e/ou produtos sem cadastro (neste caso realizaremos a recusa total da NF); \n
+•	No ato do recebimento das mercadorias, se caso houver avarias, faltas ou inversão de produtos, emitiremos de imediato a nota fiscal de devolução, sem a necessidade de contatar a indústria e entregaremos ao motorista responsável pela entrega. \n
+•	O shelf-life para o recebimento de mercadorias é de no mínimo 70% em diante da data de fabricação. Abaixo deste percentual efetuaremos a nota fiscal de devolução destes itens.\n
+•	Será cobrado um valor por palete/por tonelada descarregada, de acordo com a tabela: \n
+Tipo da carga	Valor unit.\n
+Pallet monoproduto	R$ 35,00\n
+Pallet misto	R$ 45,00\n
+Estivado (por ton.)	R$ 62,00\n
     """
 )
 
 # Define the path for the CSV file
-csv_file_path = "tickets.csv"
+csv_file_path = "schedules.csv"
 
-# Load existing tickets from CSV or create a new dataframe
+# Load existing schedules from CSV or create a new dataframe
 if os.path.exists(csv_file_path):
     df = pd.read_csv(csv_file_path)
 else:
-    np.random.seed(42)
-    issue_descriptions = [
-        "Network connectivity issues in the office",
-        "Software application crashing on startup",
-        "Printer not responding to print commands",
-        "Email server downtime",
-        "Data backup failure",
-        "Login authentication problems",
-        "Website performance degradation",
-        "Security vulnerability identified",
-        "Hardware malfunction in the server room",
-        "Employee unable to access shared files",
-        "Database connection failure",
-        "Mobile application not syncing data",
-        "VoIP phone system issues",
-        "VPN connection problems for remote employees",
-        "System updates causing compatibility issues",
-        "File server running out of storage space",
-        "Intrusion detection system alerts",
-        "Inventory management system errors",
-        "Customer data not loading in CRM",
-        "Collaboration tool not sending notifications",
-    ]
-    data = {
-        "ID": [f"TICKET-{i}" for i in range(1100, 1000, -1)],
-        "Issue": np.random.choice(issue_descriptions, size=100),
-        "Status": np.random.choice(["Open", "In Progress", "Closed"], size=100),
-        "Priority": np.random.choice(["High", "Medium", "Low"], size=100),
-        "Date Submitted": [
-            datetime.date(2023, 6, 1) + datetime.timedelta(days=random.randint(0, 182))
-            for _ in range(100)
-        ],
-    }
-    df = pd.DataFrame(data)
+    # Create an empty dataframe with the necessary columns
+    df = pd.DataFrame(
+        columns=["ID", "Fornecedor", "Número da NF", "Drop-off Date", "Drop-off Time", "Status", "Tipo de Carga",
+                 "Número de Pallets", "Peso Total", "Número de SKUs"])
     df.to_csv(csv_file_path, index=False)  # Save the initial dataframe
 
-# Show a section to add a new ticket.
-st.header("Add a ticket")
+# Section to add a new schedule
+st.header("Add a New Schedule")
 
-with st.form("add_ticket_form"):
-    issue = st.text_area("Describe the issue")
-    priority = st.selectbox("Priority", ["High", "Medium", "Low"])
+with st.form("add_schedule_form"):
+    supplier_name = st.text_input("Fornecedor")
+    product = st.text_input("Número da NF")
+    dropoff_date = st.date_input("Drop-off Date", min_value=datetime.date.today())
+    dropoff_time = st.time_input("Drop-off Time")
+    status = st.selectbox("Status", ["Scheduled", "Completed", "Cancelled"])
+    load_type = st.selectbox("Tipo de Carga", ["Pallet Monoproduto", "Pallet Misto", "Estivado"])
+    pallet_number = st.number_input("Número de Pallets", step=1)
+    total_weight = st.number_input("Peso Total", step=1)
+    sku_number = st.number_input("Número de SKUs", step=1)
     submitted = st.form_submit_button("Submit")
 
 if submitted:
-    recent_ticket_number = int(max(df.ID).split("-")[1])
-    today = datetime.datetime.now().strftime("%Y-%m-%d")
-    df_new = pd.DataFrame(
-        [
-            {
-                "ID": f"TICKET-{recent_ticket_number+1}",
-                "Issue": issue,
-                "Status": "Open",
-                "Priority": priority,
-                "Date Submitted": today,
-            }
-        ]
-    )
+    recent_schedule_id = int(df["ID"].max()[8:]) + 1 if not df.empty else 1
+    new_schedule = {
+        "ID": f"SCHEDULE-{recent_schedule_id}",
+        "Fornecedor": supplier_name,
+        "Número da NF": product,
+        "Drop-off Date": dropoff_date,
+        "Drop-off Time": dropoff_time.strftime("%H:%M"),
+        "Status": status,
+        "Tipo de Carga": load_type,
+        "Número de Pallets": pallet_number,
+        "Peso Total": total_weight,
+        "Número de SKUs": sku_number
+    }
 
-    st.write("Ticket submitted! Here are the ticket details:")
+    df_new = pd.DataFrame([new_schedule])
+
+    st.write("Schedule submitted! Here are the schedule details:")
     st.dataframe(df_new, use_container_width=True, hide_index=True)
 
     df = pd.concat([df_new, df], axis=0)
     df.to_csv(csv_file_path, index=False)  # Save the updated dataframe
 
-# Show section to view and edit existing tickets in a table.
-st.header("Existing tickets")
-st.write(f"Number of tickets: `{len(df)}`")
+# Section to view and edit existing schedules
+st.header("Existing Schedules")
+st.write(f"Number of schedules: `{len(df)}`")
 
 st.info(
-    "You can edit the tickets by double clicking on a cell. Note how the plots below "
+    "You can edit the schedules by double-clicking on a cell. Note how the plots below "
     "update automatically! You can also sort the table by clicking on the column headers.",
     icon="✍️",
 )
@@ -107,18 +89,12 @@ edited_df = st.data_editor(
     column_config={
         "Status": st.column_config.SelectboxColumn(
             "Status",
-            help="Ticket status",
-            options=["Open", "In Progress", "Closed"],
-            required=True,
-        ),
-        "Priority": st.column_config.SelectboxColumn(
-            "Priority",
-            help="Priority",
-            options=["High", "Medium", "Low"],
+            help="Schedule status",
+            options=["Scheduled", "Completed", "Cancelled"],
             required=True,
         ),
     },
-    disabled=["ID", "Date Submitted"],
+    disabled=["ID", "Fornecedor", "Número da NF", "Drop-off Date", "Drop-off Time"],
 )
 
 # Save edits back to CSV
@@ -126,22 +102,22 @@ if edited_df is not None:
     df = edited_df
     df.to_csv(csv_file_path, index=False)
 
-# Show some metrics and charts about the ticket.
+# Show some metrics and charts about the schedules
 st.header("Statistics")
 
 col1, col2, col3 = st.columns(3)
-num_open_tickets = len(df[df.Status == "Open"])
-col1.metric(label="Number of open tickets", value=num_open_tickets, delta=10)
-col2.metric(label="First response time (hours)", value=5.2, delta=-1.5)
-col3.metric(label="Average resolution time (hours)", value=16, delta=2)
+num_scheduled = len(df[df.Status == "Scheduled"])
+col1.metric(label="Number of scheduled drop-offs", value=num_scheduled, delta=5)
+col2.metric(label="Completed drop-offs", value=len(df[df.Status == "Completed"]))
+col3.metric(label="Cancelled drop-offs", value=len(df[df.Status == "Cancelled"]))
 
 st.write("")
-st.write("##### Ticket status per month")
+st.write("##### Drop-off status per month")
 status_plot = (
     alt.Chart(df)
     .mark_bar()
     .encode(
-        x="month(Date Submitted):O",
+        x="month(Drop-off Date):O",
         y="count():Q",
         xOffset="Status:N",
         color="Status:N",
@@ -152,14 +128,14 @@ status_plot = (
 )
 st.altair_chart(status_plot, use_container_width=True, theme="streamlit")
 
-st.write("##### Current ticket priorities")
-priority_plot = (
+st.write("##### Current drop-off statuses")
+status_distribution_plot = (
     alt.Chart(df)
     .mark_arc()
-    .encode(theta="count():Q", color="Priority:N")
+    .encode(theta="count():Q", color="Status:N")
     .properties(height=300)
     .configure_legend(
         orient="bottom", titleFontSize=14, labelFontSize=14, titlePadding=5
     )
 )
-st.altair_chart(priority_plot, use_container_width=True, theme="streamlit")
+st.altair_chart(status_distribution_plot, use_container_width=True, theme="streamlit")
