@@ -81,7 +81,7 @@ if submitted:
             "Número de Pallets": pallet_number,
             "Peso Total": total_weight,
             "Número de SKUs": sku_number,
-            "Data de Criação": datetime.datetime.now()
+            "Data de Criação": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
 
         df_new = pd.DataFrame([new_schedule])
