@@ -14,13 +14,18 @@ st.write(
 •	Não acataremos divergências de preços e/ou quantidades (nestes casos emitiremos a NF devolução parcial), ou de prazo e/ou produtos sem cadastro (neste caso realizaremos a recusa total da NF); \n
 •	No ato do recebimento das mercadorias, se caso houver avarias, faltas ou inversão de produtos, emitiremos de imediato a nota fiscal de devolução, sem a necessidade de contatar a indústria e entregaremos ao motorista responsável pela entrega. \n
 •	O shelf-life para o recebimento de mercadorias é de no mínimo 70% em diante da data de fabricação. Abaixo deste percentual efetuaremos a nota fiscal de devolução destes itens.\n
-•	Será cobrado um valor por palete/por tonelada descarregada, de acordo com a tabela: \n
-Tipo da carga	Valor unit.\n
-Pallet monoproduto	R$ 35,00\n
-Pallet misto	R$ 45,00\n
-Estivado (por ton.)	R$ 62,00\n
+•	Será cobrado um valor por palete/por tonelada descarregada, de acordo com a tabela:
     """
 )
+
+dicionario_precos = {
+    "Tipo da carga": ["Pallet monoproduto", "Pallet misto", "Estivado (por ton.)"],
+    "Valor unitário": ["R$ 35,00", "R$ 45,00", "R$ 62,00"]
+}
+
+# Creating the DataFrame
+dataframe_precos = pd.DataFrame(dicionario_precos)
+st.table(dataframe_precos)
 
 # Define the path for the CSV file
 csv_file_path = "schedules.csv"
