@@ -7,9 +7,10 @@ import altair as alt
 # Set the page configuration
 st.set_page_config(page_title="Agendamento de Entrega", page_icon="📅")
 st.title("📅 Agendamento de Entrega")
+st.divider()
+st.subheader("Regras gerais para entrega")
 st.write(
     """
-    Regras gerais para entrega:\n
 •	Não acataremos divergências de preços e/ou quantidades (nestes casos emitiremos a NF devolução parcial), ou de prazo e/ou produtos sem cadastro (neste caso realizaremos a recusa total da NF); \n
 •	No ato do recebimento das mercadorias, se caso houver avarias, faltas ou inversão de produtos, emitiremos de imediato a nota fiscal de devolução, sem a necessidade de contatar a indústria e entregaremos ao motorista responsável pela entrega. \n
 •	O shelf-life para o recebimento de mercadorias é de no mínimo 70% em diante da data de fabricação. Abaixo deste percentual efetuaremos a nota fiscal de devolução destes itens.\n
@@ -30,7 +31,7 @@ if os.path.exists(csv_file_path):
 else:
     # Create an empty dataframe with the necessary columns
     df = pd.DataFrame(
-        columns=["ID", "Fornecedor", "Número da NF", "Drop-off Date", "Drop-off Time", "Status",
+        columns=["ID", "Indústria", "Número da NF", "Data", "Horário", "Status",
                  "Centro de Distribuição", "Tipo de Carga",
                  "Número de Pallets", "Peso Total", "Número de SKUs"])
     df.to_csv(csv_file_path, index=False)  # Save the initial dataframe
@@ -39,10 +40,10 @@ else:
 st.header("Adicionar Agendamento")
 
 with st.form("add_schedule_form"):
-    supplier_name = st.text_input("Fornecedor")
+    supplier_name = st.text_input("Indústria")
     product = st.text_input("Número da NF")
-    dropoff_date = st.date_input("Drop-off Date", min_value=datetime.date.today())
-    dropoff_time = st.time_input("Drop-off Time")
+    dropoff_date = st.date_input("Data", min_value=datetime.date.today())
+    dropoff_time = st.time_input("Horário")
     status = st.selectbox("Status", ["Agendado", "Completo", "Cancelado"])
     distribution_center = st.selectbox("Centro de Distribuição", ["CLAS", "GPA", "JSL"])
     load_type = st.selectbox("Tipo de Carga", ["Pallet Monoproduto", "Pallet Misto", "Estivado"])
@@ -56,7 +57,7 @@ max_schedules_per_day = 5
 
 if submitted:
     # Check how many schedules are already set for the selected drop-off date
-    schedules_on_date = df[(df["Drop-off Date"] == str(dropoff_date)) &
+    schedules_on_date = df[(df["Data"] == str(dropoff_date)) &
                            (df["Centro de Distribuição"] == distribution_center)]
     if len(schedules_on_date) >= max_schedules_per_day:
         st.error(
@@ -65,10 +66,10 @@ if submitted:
         recent_schedule_id = int(df["ID"].max()[8:]) + 1 if not df.empty else 1
         new_schedule = {
             "ID": f"SCHEDULE-{recent_schedule_id}",
-            "Fornecedor": supplier_name,
+            "Indústria": supplier_name,
             "Número da NF": product,
-            "Drop-off Date": dropoff_date,
-            "Drop-off Time": dropoff_time.strftime("%H:%M"),
+            "Data": dropoff_date,
+            "Horário": dropoff_time.strftime("%H:%M"),
             "Status": status,
             "Centro de Distribuição": distribution_center,
             "Tipo de Carga": load_type,
@@ -116,7 +117,7 @@ edited_df = st.data_editor(
             required=True,
         ),
     },
-    disabled=["ID", "Fornecedor", "Número da NF", "Drop-off Date", "Drop-off Time", "Centro de Distribuição",
+    disabled=["ID", "Indústria", "Número da NF", "Data", "Horário", "Centro de Distribuição",
               "Tipo de Carga", "Número de Pallets", "Peso Total", "Número de SKUs"],
 )
 
@@ -140,7 +141,7 @@ status_plot = (
     alt.Chart(df)
     .mark_bar()
     .encode(
-        x="month(Drop-off Date):O",
+        x="month(Data):O",
         y="count():Q",
         xOffset="Status:N",
         color="Status:N",
