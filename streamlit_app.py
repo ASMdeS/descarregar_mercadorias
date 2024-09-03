@@ -30,7 +30,7 @@ if os.path.exists(csv_file_path):
 else:
     # Create an empty dataframe with the necessary columns
     df = pd.DataFrame(
-        columns=["ID", "Fornecedor", "Número da NF", "Drop-off Date", "Drop-off Time", "Status", "Tipo de Carga",
+        columns=["ID", "Fornecedor", "Número da NF", "Drop-off Date", "Drop-off Time", "Status", "Centro de Distribuição", "Tipo de Carga",
                  "Número de Pallets", "Peso Total", "Número de SKUs"])
     df.to_csv(csv_file_path, index=False)  # Save the initial dataframe
 
@@ -43,6 +43,7 @@ with st.form("add_schedule_form"):
     dropoff_date = st.date_input("Drop-off Date", min_value=datetime.date.today())
     dropoff_time = st.time_input("Drop-off Time")
     status = st.selectbox("Status", ["Scheduled", "Completed", "Cancelled"])
+    distribution_center = st.selectbox("Centro de Distribuição", ["CLAS", "GPA", "JSL"])
     load_type = st.selectbox("Tipo de Carga", ["Pallet Monoproduto", "Pallet Misto", "Estivado"])
     pallet_number = st.number_input("Número de Pallets", step=1)
     total_weight = st.number_input("Peso Total", step=1)
@@ -58,6 +59,7 @@ if submitted:
         "Drop-off Date": dropoff_date,
         "Drop-off Time": dropoff_time.strftime("%H:%M"),
         "Status": status,
+        "Centro de Distribuição": distribution_center,
         "Tipo de Carga": load_type,
         "Número de Pallets": pallet_number,
         "Peso Total": total_weight,
