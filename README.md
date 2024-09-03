@@ -1,8 +1,8 @@
-# 🎫 Support tickets template
+# 📅 Agendamento de Entrega
 
-A simple Streamlit app showing an internal tool that lets you create, manage, and visualize support tickets. 
+Este projeto é uma aplicação em Streamlit que permite agendar e gerenciar a entrega de mercadorias em centros de distribuição. A aplicação inclui funcionalidades para adicionar novos agendamentos, visualizar e editar agendamentos existentes, além de exibir estatísticas e gráficos sobre os agendamentos.
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://support-tickets-template.streamlit.app/)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://descarregar-mercadorias.streamlit.app/)
 
 ### How to run it on your own machine
 
