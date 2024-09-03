@@ -31,9 +31,9 @@ if os.path.exists(csv_file_path):
 else:
     # Create an empty dataframe with the necessary columns
     df = pd.DataFrame(
-        columns=["ID", "Indústria", "Número da NF", "Data", "Horário", "Status",
+        columns=["ID", "Indústria", "Número da NF", "Drop-off Date", "Drop-off Time", "Status",
                  "Centro de Distribuição", "Tipo de Carga",
-                 "Número de Pallets", "Peso Total", "Número de SKUs"])
+                 "Número de Pallets", "Peso Total", "Número de SKUs", "Data de Criação"])
     df.to_csv(csv_file_path, index=False)  # Save the initial dataframe
 
 # Section to add a new schedule
@@ -43,7 +43,7 @@ with st.form("add_schedule_form"):
     supplier_name = st.text_input("Indústria")
     product = st.text_input("Número da NF")
     dropoff_date = st.date_input("Data", min_value=datetime.date.today())
-    dropoff_time = st.time_input("Horário")
+    dropoff_time = st.time_input("Drop-off Time")
     status = st.selectbox("Status", ["Agendado", "Completo", "Cancelado"])
     distribution_center = st.selectbox("Centro de Distribuição", ["CLAS", "GPA", "JSL"])
     load_type = st.selectbox("Tipo de Carga", ["Pallet Monoproduto", "Pallet Misto", "Estivado"])
@@ -57,7 +57,7 @@ max_schedules_per_day = 5
 
 if submitted:
     # Check how many schedules are already set for the selected drop-off date
-    schedules_on_date = df[(df["Data"] == str(dropoff_date)) &
+    schedules_on_date = df[(df["Drop-off Date"] == str(dropoff_date)) &
                            (df["Centro de Distribuição"] == distribution_center)]
     if len(schedules_on_date) >= max_schedules_per_day:
         st.error(
@@ -68,14 +68,15 @@ if submitted:
             "ID": f"SCHEDULE-{recent_schedule_id}",
             "Indústria": supplier_name,
             "Número da NF": product,
-            "Data": dropoff_date,
-            "Horário": dropoff_time.strftime("%H:%M"),
+            "Drop-off Date": dropoff_date,
+            "Drop-off Time": dropoff_time.strftime("%H:%M"),
             "Status": status,
             "Centro de Distribuição": distribution_center,
             "Tipo de Carga": load_type,
             "Número de Pallets": pallet_number,
             "Peso Total": total_weight,
-            "Número de SKUs": sku_number
+            "Número de SKUs": sku_number,
+            "Data de Criação": datetime.datetime.now()
         }
 
         df_new = pd.DataFrame([new_schedule])
@@ -117,7 +118,7 @@ edited_df = st.data_editor(
             required=True,
         ),
     },
-    disabled=["ID", "Indústria", "Número da NF", "Data", "Horário", "Centro de Distribuição",
+    disabled=["ID", "Indústria", "Número da NF", "Drop-off Date", "Drop-off Time", "Centro de Distribuição",
               "Tipo de Carga", "Número de Pallets", "Peso Total", "Número de SKUs"],
 )
 
@@ -141,7 +142,7 @@ status_plot = (
     alt.Chart(df)
     .mark_bar()
     .encode(
-        x="month(Data):O",
+        x="month(Drop-off Date):O",
         y="count():Q",
         xOffset="Status:N",
         color="Status:N",
