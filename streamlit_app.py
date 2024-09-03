@@ -43,7 +43,7 @@ with st.form("add_schedule_form"):
     supplier_name = st.text_input("Indústria")
     product = st.text_input("Número da NF")
     dropoff_date = st.date_input("Data", min_value=datetime.date.today())
-    dropoff_time = st.time_input("Drop-off Time")
+    dropoff_time = st.time_input("Horário")
     status = st.selectbox("Status", ["Agendado", "Completo", "Cancelado"])
     distribution_center = st.selectbox("Centro de Distribuição", ["CLAS", "GPA", "JSL"])
     load_type = st.selectbox("Tipo de Carga", ["Pallet Monoproduto", "Pallet Misto", "Estivado"])
