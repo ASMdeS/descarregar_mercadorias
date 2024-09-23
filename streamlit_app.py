@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import streamlit as st
 import altair as alt
+from datetime import time
 
 # Set the page configuration
 st.set_page_config(page_title="Agendamento de Entrega", page_icon="📅")
@@ -11,7 +12,7 @@ st.divider()
 st.subheader("Regras gerais para entrega")
 st.write(
     """
-•	Não acataremos divergências de preços e/ou quantidades (nestes casos emitiremos a NF devolução parcial), ou de prazo e/ou produtos sem cadastro (neste caso realizaremos a recusa total da NF); \n
+•	Não acataremos divergências de preços e/ou quantidades (nestes casos emitiremos a NF devolução parcial), ou de prazo e/ou produtos sem cadastro (neste caso realizaremos a recusa total da NF). \n
 •	No ato do recebimento das mercadorias, se caso houver avarias, faltas ou inversão de produtos, emitiremos de imediato a nota fiscal de devolução, sem a necessidade de contatar a indústria e entregaremos ao motorista responsável pela entrega. \n
 •	O shelf-life para o recebimento de mercadorias é de no mínimo 70% em diante da data de fabricação. Abaixo deste percentual efetuaremos a nota fiscal de devolução destes itens.\n
 •	Será cobrado um valor por palete/por tonelada descarregada, de acordo com a tabela:
@@ -19,7 +20,7 @@ st.write(
 )
 
 dicionario_precos = {
-    "Tipo da carga": ["Pallet monoproduto", "Pallet misto", "Estivado (por ton.)"],
+    "Tipo da carga": ["Pallet monoproduto", "Pallet misto", "Estivado (por tonelada)"],
     "Valor unitário": ["R$ 35,00", "R$ 45,00", "R$ 62,00"]
 }
 
@@ -60,6 +61,10 @@ with st.form("add_schedule_form"):
 # Define the maximum number of schedules allowed per day
 max_schedules_per_day = 5
 
+# Definindo o horário mínimo e máximo
+min_time = time(8, 0)   # 08:00 AM
+max_time = time(18, 0)  # 06:00 PM
+
 if submitted:
     # Check how many schedules are already set for the selected drop-off date
     schedules_on_date = df[(df["Drop-off Date"] == str(dropoff_date)) &
@@ -67,10 +72,12 @@ if submitted:
     if len(schedules_on_date) >= max_schedules_per_day:
         st.error(
             f"Não é possível agendar mais de {max_schedules_per_day} entregas para o dia {dropoff_date} por Centro de Distribuição.")
+    elif dropoff_time < min_time or dropoff_time > max_time:
+        st.error(f"É necessário agendar entre às 8hrs e 18hrs")
     else:
-        recent_schedule_id = int(df["ID"].max()[8:]) + 1 if not df.empty else 1
+        recent_schedule_id = int(max(df.ID).split("-")[1])
         new_schedule = {
-            "ID": f"SCHEDULE-{recent_schedule_id}",
+            "ID": f"SCHEDULE-{recent_schedule_id + 1}",
             "Indústria": supplier_name,
             "Número da NF": product,
             "Drop-off Date": dropoff_date,
