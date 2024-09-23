@@ -62,8 +62,14 @@ with st.form("add_schedule_form"):
 max_schedules_per_day = 5
 
 # Definindo o horário mínimo e máximo
-min_time = time(8, 0)   # 08:00 AM
-max_time = time(18, 0)  # 06:00 PM
+min_clas = time(7, 0)  # 08:00 AM
+max_clas = time(15, 0)  # 06:00 PM
+
+min_jsl = time(13, 30)  # 08:00 AM
+max_jsl = time(22, 0)  # 06:00 PM
+
+min_gpa = time(8, 0)  # 08:00 AM
+max_gpa = time(15, 0)  # 06:00 PM
 
 if submitted:
     # Check how many schedules are already set for the selected drop-off date
@@ -72,8 +78,12 @@ if submitted:
     if len(schedules_on_date) >= max_schedules_per_day:
         st.error(
             f"Não é possível agendar mais de {max_schedules_per_day} entregas para o dia {dropoff_date} por Centro de Distribuição.")
-    elif dropoff_time < min_time or dropoff_time > max_time:
-        st.error(f"É necessário agendar entre às 8hrs e 18hrs")
+    elif distribution_center == "CLAS" and (dropoff_time < min_clas or dropoff_time > max_clas):
+        st.error(f"É necessário agendar entre às 7hrs e 15hrs")
+    elif distribution_center == "JSL" and (dropoff_time < min_jsl or dropoff_time > max_jsl):
+        st.error(f"É necessário agendar entre às 13hrs30min e 22hrs")
+    elif distribution_center == "GPA" and (dropoff_time < min_gpa or dropoff_time > max_gpa):
+        st.error(f"É necessário agendar entre às 8hrs e 15hrs")
     else:
         recent_schedule_id = int(max(df.ID).split("-")[1])
         new_schedule = {
@@ -98,7 +108,6 @@ if submitted:
 
         df = pd.concat([df_new, df], axis=0)
         df.to_csv(csv_file_path, index=False)  # Save the updated dataframe
-
 
 # Section to view and edit existing schedules
 st.header("Agendamentos Existentes")
