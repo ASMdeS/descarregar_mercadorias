@@ -85,7 +85,10 @@ if submitted:
     elif distribution_center == "GPA" and (dropoff_time < min_gpa or dropoff_time > max_gpa):
         st.error(f"É necessário agendar entre às 8hrs e 15hrs")
     else:
-        recent_schedule_id = int(max(df.ID).split("-")[1])
+        if df.empty or df.ID.isnull().all():
+            recent_schedule_id = 1  # Caso não haja registros anteriores, começar com o ID 1
+        else:
+            recent_schedule_id = int(max(df.ID).split("-")[1])
         new_schedule = {
             "ID": f"SCHEDULE-{recent_schedule_id + 1}",
             "Indústria": supplier_name,
