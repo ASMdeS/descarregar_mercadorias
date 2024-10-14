@@ -5,6 +5,17 @@ import streamlit as st
 import altair as alt
 from datetime import time
 
+def get_finishing_time(start_date, start_time):
+    offloading_duration = {"Pallet Monoproduto": datetime.timedelta(minutes=30), 'Pallet Misto': datetime.timedelta(minutes=60),
+                           'Estivado': datetime.timedelta(minutes=120)}
+    # Combine date and time into a single datetime object
+    start_datetime = datetime.datetime.combine(dropoff_date, dropoff_time)
+
+    # Add 1 hour to the dropoff datetime
+    end_time = start_datetime + datetime.timedelta(hours=1)
+
+    return end_time.time()
+
 # Set the page configuration
 st.set_page_config(page_title="Agendamento de Entrega", page_icon="📅")
 st.title("📅 Agendamento de Entrega")
@@ -37,7 +48,7 @@ if os.path.exists(csv_file_path):
 else:
     # Create an empty dataframe with the necessary columns
     df = pd.DataFrame(
-        columns=["ID", "Indústria", "Número da NF", "Drop-off Date", "Drop-off Time", "Status",
+        columns=["ID", "Indústria", "Número da NF", "Drop-off Date", "Drop-off Time", "Finishing Time","Status",
                  "Centro de Distribuição", "Tipo de Carga",
                  "Número de Pallets", "Peso Total", "Número de SKUs", "Data de Criação"])
     df.to_csv(csv_file_path, index=False)  # Save the initial dataframe
@@ -49,7 +60,7 @@ with st.form("add_schedule_form"):
     supplier_name = st.text_input("Indústria")
     product = st.text_input("Número da NF")
     dropoff_date = st.date_input("Data", min_value=datetime.date.today())
-    dropoff_time = st.time_input("Horário")
+    dropoff_time = st.time_input("Horário", min_value=datetime.datetime.now().time())
     status = st.selectbox("Status", ["Agendado", "Completo", "Cancelado"])
     distribution_center = st.selectbox("Centro de Distribuição", ["CLAS", "GPA", "JSL"])
     load_type = st.selectbox("Tipo de Carga", ["Pallet Monoproduto", "Pallet Misto", "Estivado"])
@@ -59,34 +70,34 @@ with st.form("add_schedule_form"):
     submitted = st.form_submit_button("Enviar")
 
 # Define the maximum number of schedules allowed per day
-max_schedules_per_day = 5
+max_schedules = {'CLAS': 10, 'JSL': 6, 'GPA': 7}
 
-# Definindo o horário mínimo e máximo
-min_clas = time(7, 0)  # 08:00 AM
-max_clas = time(15, 0)  # 06:00 PM
+# Define the maximum number of simultaneous schedules
+max_simulatenous = 2
 
-min_jsl = time(13, 30)  # 08:00 AM
-max_jsl = time(22, 0)  # 06:00 PM
+# Minimum Time
+minimum_time = {'CLAS': time(7, 0), 'JSL': time(13, 00), 'GPA': time(7, 0)}
 
-min_gpa = time(8, 0)  # 08:00 AM
-max_gpa = time(15, 0)  # 06:00 PM
+# Maximum Time
+maximum_time = {'CLAS': time(15, 0), 'JSL': time(20, 00), 'GPA': time(14, 0)}
+
+"Pallet Monoproduto", "Pallet Misto", "Estivado"
+# Offloading Duration
+offloading_duration = {"Pallet Monoproduto":  datetime.timedelta(2, 0), 'JSL': datetime.timedelta(20, 00), 'GPA': time(14, 0)}
 
 if submitted:
     # Check how many schedules are already set for the selected drop-off date
     schedules_on_date = df[(df["Drop-off Date"] == str(dropoff_date)) &
                            (df["Centro de Distribuição"] == distribution_center)]
-    if len(schedules_on_date) >= max_schedules_per_day:
+    if len(schedules_on_date) >= max_schedules[distribution_center]:
         st.error(
-            f"Não é possível agendar mais de {max_schedules_per_day} entregas para o dia {dropoff_date} por Centro de Distribuição.")
-    elif distribution_center == "CLAS" and (dropoff_time < min_clas or dropoff_time > max_clas):
-        st.error(f"É necessário agendar entre às 7hrs e 15hrs")
-    elif distribution_center == "JSL" and (dropoff_time < min_jsl or dropoff_time > max_jsl):
-        st.error(f"É necessário agendar entre às 13hrs30min e 22hrs")
-    elif distribution_center == "GPA" and (dropoff_time < min_gpa or dropoff_time > max_gpa):
-        st.error(f"É necessário agendar entre às 8hrs e 15hrs")
+            f"Não é possível agendar mais de {max_schedules[distribution_center]} entregas para o dia {dropoff_date} por Centro de Distribuição.")
+    elif dropoff_time < minimum_time[distribution_center] or dropoff_time > maximum_time[distribution_center]:
+        st.error(
+            f"É necessário agendar entre às {minimum_time[distribution_center]} e {maximum_time[distribution_center]}")
     else:
         if df.empty or df.ID.isnull().all():
-            recent_schedule_id = 1  # Caso não haja registros anteriores, começar com o ID 1
+            recent_schedule_id = 0
         else:
             recent_schedule_id = int(max(df.ID).split("-")[1])
         new_schedule = {
