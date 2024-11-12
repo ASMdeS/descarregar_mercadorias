@@ -6,6 +6,7 @@ import mysql.connector
 from mysql.connector import Error
 from datetime import time
 
+
 def get_finishing_time(start_date, start_time, type):
     # Define offloading durations for each type
     offloading_duration = {
@@ -28,17 +29,23 @@ def get_finishing_time(start_date, start_time, type):
     return end_time.time()
 
 
-# Function to connect to MySQL
+
+
+# Fetch MySQL connection details from secrets
+db_config = {
+    "host": st.secrets["mysql"]["host"],
+    "user": st.secrets["mysql"]["username"],
+    "password": st.secrets["mysql"]["password"],
+    "database": st.secrets["mysql"]["database"],
+    "port": st.secrets["mysql"]["port"],
+}
+
+# Function to establish a connection
 def create_connection():
     try:
-        conn = mysql.connector.connect(
-            host='your_host',
-            user='your_user',
-            password='your_password',
-            database='your_database'
-        )
+        conn = mysql.connector.connect(**db_config)
         return conn
-    except Error as e:
+    except mysql.connector.Error as e:
         st.error(f"Error connecting to MySQL: {e}")
         return None
 
@@ -67,12 +74,6 @@ def insert_schedule(schedule_data):
     else:
         st.error("Could not establish a database connection.")
 
-# Initialize connection.
-conn = st.connection('mysql', type='sql')
-
-# Perform query.
-df = conn.query('SELECT * from Scheduling;', ttl=600)
-
 
 # Set the page configuration
 st.set_page_config(page_title="Agendamento de Entrega", page_icon="📅")
@@ -87,6 +88,7 @@ st.write(
 •	Será cobrado um valor por palete/por tonelada descarregada, de acordo com a tabela:
     """
 )
+
 
 dicionario_precos = {
     "Tipo da carga": ["Pallet monoproduto", "Pallet misto", "Estivado (por tonelada)"],
@@ -118,7 +120,7 @@ with st.form("add_schedule_form"):
     supplier_name = st.text_input("Indústria")
     invoice = st.text_input("Número da NF")
     dropoff_date = st.date_input("Data", min_value=datetime.date.today())
-    dropoff_time = st.time_input("Horário", min_value=datetime.datetime.now().time())
+    dropoff_time = st.time_input("Horário")
     status = st.selectbox("Status", ["Agendado", "Completo", "Cancelado"])
     distribution_center = st.selectbox("Centro de Distribuição", ["CLAS", "GPA", "JSL"])
     load_type = st.selectbox("Tipo de Carga", ["Pallet Monoproduto", "Pallet Misto", "Estivado"])
@@ -168,93 +170,7 @@ if submitted:
             "Número de SKUs": sku_number,
             "Data de Criação": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
-
-        # Insert the new schedule into MySQL database
-        insert_query = """
-                    INSERT INTO Scheduling 
-                    (ID, Supplier_Name, Invoice_Number, Dropoff_Date, Dropoff_Time, Status, Distribution_Center, Load_Type, 
-                    Pallet_Number, Total_Weight, SKU_Count, Created_At) 
-                    VALUES (%(ID)s, %(Supplier_Name)s, %(Invoice_Number)s, %(Dropoff_Date)s, %(Dropoff_Time)s, %(Status)s, 
-                            %(Distribution_Center)s, %(Load_Type)s, %(Pallet_Number)s, %(Total_Weight)s, %(SKU_Count)s, %(Created_At)s);
-                """
-        conn.execute(insert_query, new_schedule)
+        insert_schedule(new_schedule)
 
         st.success("Agendamento enviado! Aqui estão os detalhes:")
         st.dataframe(pd.DataFrame([new_schedule]), use_container_width=True, hide_index=True)
-
-# Section to view and edit existing schedules
-st.header("Agendamentos Existentes")
-st.write(f"Número de Agendamentos: `{len(df)}`")
-
-# Add a selectbox to filter by Distribution Center
-distribution_center_filter = st.selectbox("Filtrar por Centro de Distribuição",
-                                          ["Todos"] + df["Centro de Distribuição"].unique().tolist())
-
-# Filter the dataframe based on the selected Distribution Center
-if distribution_center_filter != "Todos":
-    df = df[df["Centro de Distribuição"] == distribution_center_filter]
-
-st.info(
-    "Você pode editar os agendamentos ao clicar duas vezes em uma célula. Perceba como os gráficos "
-    "são atualizados automaticamente! Você também pode ordenar a tabela ao clicar no cabeçalho das colunas.",
-    icon="✍️",
-)
-
-edited_df = st.data_editor(
-    df,
-    use_container_width=True,
-    hide_index=True,
-    column_config={
-        "Status": st.column_config.SelectboxColumn(
-            "Status",
-            help="Schedule status",
-            options=["Agendado", "Completo", "Cancelado"],
-            required=True,
-        ),
-    },
-    disabled=["ID", "Indústria", "Número da NF", "Drop-off Date", "Drop-off Time", "Centro de Distribuição",
-              "Tipo de Carga", "Número de Pallets", "Peso Total", "Número de SKUs"],
-)
-
-# Save edits back to CSV
-if edited_df is not None:
-    df = edited_df
-    df.to_csv(csv_file_path, index=False)
-
-# Show some metrics and charts about the schedules
-st.header("Statistics")
-
-col1, col2, col3 = st.columns(3)
-num_scheduled = len(df[df.Status == "Agendado"])
-col1.metric(label="Number of scheduled drop-offs", value=num_scheduled, delta=5)
-col2.metric(label="Completo drop-offs", value=len(df[df.Status == "Completo"]))
-col3.metric(label="Cancelado drop-offs", value=len(df[df.Status == "Cancelado"]))
-
-st.write("")
-st.write("##### Drop-off status per month")
-status_plot = (
-    alt.Chart(df)
-    .mark_bar()
-    .encode(
-        x="month(Drop-off Date):O",
-        y="count():Q",
-        xOffset="Status:N",
-        color="Status:N",
-    )
-    .configure_legend(
-        orient="bottom", titleFontSize=14, labelFontSize=14, titlePadding=5
-    )
-)
-st.altair_chart(status_plot, use_container_width=True, theme="streamlit")
-
-st.write("##### Current drop-off statuses")
-status_distribution_plot = (
-    alt.Chart(df)
-    .mark_arc()
-    .encode(theta="count():Q", color="Status:N")
-    .properties(height=300)
-    .configure_legend(
-        orient="bottom", titleFontSize=14, labelFontSize=14, titlePadding=5
-    )
-)
-st.altair_chart(status_distribution_plot, use_container_width=True, theme="streamlit")

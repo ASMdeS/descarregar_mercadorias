@@ -1,3 +1,6 @@
 streamlit
 pandas
 altair
+mysqlclient
+SQLAlchemy
+mysql-connector-python
