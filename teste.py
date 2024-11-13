@@ -1,79 +1,56 @@
 import datetime
-import os
 import pandas as pd
 import streamlit as st
-import mysql.connector
-from mysql.connector import Error
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
 from datetime import time
+from sqlalchemy.orm import sessionmaker
 
-
-def get_finishing_time(start_date, start_time, type):
-    # Define offloading durations for each type
+def get_finishing_time(start_date, start_time, category):
     offloading_duration = {
         "Pallet Monoproduto": datetime.timedelta(minutes=30),
         "Pallet Misto": datetime.timedelta(minutes=60),
         "Estivado": datetime.timedelta(minutes=120)
     }
-
-    # Combine start_date and start_time into a single datetime object
     start_datetime = datetime.datetime.combine(start_date, start_time)
-
-    # Retrieve the offloading time for the specified type
-    # Default to zero timedelta if the type is not found
-    duration = offloading_duration.get(type, datetime.timedelta())
-
-    # Calculate end_time by adding the offloading duration to start_datetime
+    duration = offloading_duration.get(category, datetime.timedelta())
     end_time = start_datetime + duration
-
-    # Return only the time component
     return end_time.time()
 
+# SQLAlchemy connection setup
+db_config = st.secrets["mysql"]
+engine = create_engine(
+    f"mysql+pymysql://{db_config['username']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}"
+)
 
+# Set up a session
+Session = sessionmaker(bind=engine)
+session = Session()
 
-
-# Fetch MySQL connection details from secrets
-db_config = {
-    "host": st.secrets["mysql"]["host"],
-    "user": st.secrets["mysql"]["username"],
-    "password": st.secrets["mysql"]["password"],
-    "database": st.secrets["mysql"]["database"],
-    "port": st.secrets["mysql"]["port"],
-}
-
-# Function to establish a connection
-def create_connection():
-    try:
-        conn = mysql.connector.connect(**db_config)
-        return conn
-    except mysql.connector.Error as e:
-        st.error(f"Error connecting to MySQL: {e}")
-        return None
-
-# Function to insert a new schedule into MySQL
 def insert_schedule(schedule_data):
-    conn = create_connection()
-    if conn is not None:
-        cursor = conn.cursor()
-        insert_query = """
+    try:
+        insert_query = text("""
             INSERT INTO Schedules 
             (ID, Supplier_Name, Invoice_Number, Dropoff_Date, Dropoff_Time, Status, Distribution_Center, Load_Type, 
             Pallet_Number, Total_Weight, SKU_Count, Created_At) 
-            VALUES (%(ID)s, %(Supplier_Name)s, %(Invoice_Number)s, %(Dropoff_Date)s, %(Dropoff_Time)s, %(Status)s, 
-                    %(Distribution_Center)s, %(Load_Type)s, %(Pallet_Number)s, %(Total_Weight)s, %(SKU_Count)s, %(Created_At)s);
-        """
-        try:
-            cursor.execute(insert_query, schedule_data)
-            conn.commit()
-            st.success("Agendamento enviado! Aqui estão os detalhes:")
-            st.dataframe(pd.DataFrame([schedule_data]), use_container_width=True, hide_index=True)
-        except Error as e:
-            st.error(f"Erro ao inserir o agendamento: {e}")
-        finally:
-            cursor.close()
-            conn.close()
-    else:
-        st.error("Could not establish a database connection.")
+            VALUES (:ID, :Supplier_Name, :Invoice_Number, :Dropoff_Date, :Dropoff_Time, :Status, 
+                    :Distribution_Center, :Load_Type, :Pallet_Number, :Total_Weight, :SKU_Count, :Created_At);
+        """)
+        session.execute(insert_query, schedule_data)
+        session.commit()  # Commit the transaction
+        st.success("Agendamento enviado! Aqui estão os detalhes:")
+        st.dataframe(pd.DataFrame([schedule_data]), use_container_width=True, hide_index=True)
+    except SQLAlchemyError as e:
+        session.rollback()  # Rollback in case of error
+        st.error(f"Erro ao inserir o agendamento: {str(e)}")
+    finally:
+        session.close()
 
+def load_schedules():
+    with engine.connect() as conn:
+        query = "SELECT * FROM Schedules"
+        dataframe = pd.read_sql(query, conn)
+    return dataframe
 
 # Set the page configuration
 st.set_page_config(page_title="Agendamento de Entrega", page_icon="📅")
@@ -99,19 +76,7 @@ dicionario_precos = {
 dataframe_precos = pd.DataFrame(dicionario_precos)
 st.table(dataframe_precos)
 
-# Define the path for the CSV file
-csv_file_path = "schedules.csv"
-
-# Load existing schedules from CSV or create a new dataframe
-if os.path.exists(csv_file_path):
-    df = pd.read_csv(csv_file_path)
-else:
-    # Create an empty dataframe with the necessary columns
-    df = pd.DataFrame(
-        columns=["ID", "Indústria", "Número da NF", "Drop-off Date", "Drop-off Time", "Finishing Time", "Status",
-                 "Centro de Distribuição", "Tipo de Carga",
-                 "Número de Pallets", "Peso Total", "Número de SKUs", "Data de Criação"])
-    df.to_csv(csv_file_path, index=False)  # Save the initial dataframe
+df = load_schedules()
 
 # Section to add a new schedule
 st.header("Adicionar Agendamento")
@@ -143,8 +108,8 @@ maximum_time = {'CLAS': time(15, 0), 'JSL': time(20, 00), 'GPA': time(14, 0)}
 
 if submitted:
     # Check how many schedules are already set for the selected drop-off date
-    schedules_on_date = df[(df["Drop-off Date"] == str(dropoff_date)) &
-                           (df["Centro de Distribuição"] == distribution_center)]
+    schedules_on_date = df[(df["Dropoff_Date"] == str(dropoff_date)) &
+                           (df["Distribution_Center"] == distribution_center)]
     if len(schedules_on_date) >= max_schedules[distribution_center]:
         st.error(
             f"Não é possível agendar mais de {max_schedules[distribution_center]} entregas para o dia {dropoff_date} por Centro de Distribuição.")
@@ -158,19 +123,16 @@ if submitted:
             recent_schedule_id = int(max(df.ID).split("-")[1])
         new_schedule = {
             "ID": f"SCHEDULE-{recent_schedule_id + 1}",
-            "Indústria": supplier_name,
-            "Número da NF": invoice,
-            "Drop-off Date": dropoff_date,
-            "Drop-off Time": dropoff_time.strftime("%H:%M"),
+            "Supplier_Name": supplier_name,
+            "Invoice_Number": invoice,
+            "Dropoff_Date": dropoff_date,
+            "Dropoff_Time": dropoff_time.strftime("%H:%M"),
             "Status": status,
-            "Centro de Distribuição": distribution_center,
-            "Tipo de Carga": load_type,
-            "Número de Pallets": pallet_number,
-            "Peso Total": total_weight,
-            "Número de SKUs": sku_number,
-            "Data de Criação": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "Distribution_Center": distribution_center,
+            "Load_Type": load_type,
+            "Pallet_Number": pallet_number,
+            "Total_Weight": total_weight,
+            "SKU_Count": sku_number,
+            "Created_At": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         insert_schedule(new_schedule)
-
-        st.success("Agendamento enviado! Aqui estão os detalhes:")
-        st.dataframe(pd.DataFrame([new_schedule]), use_container_width=True, hide_index=True)
