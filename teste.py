@@ -5,6 +5,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import time
 from sqlalchemy.orm import sessionmaker
+from pipefy import create_pipefy_card
 
 def get_finishing_time(start_date, start_time, category):
     offloading_duration = {
@@ -135,4 +136,34 @@ if submitted:
             "SKU_Count": sku_number,
             "Created_At": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
+
+        # Insert schedule into the database
         insert_schedule(new_schedule)
+
+        # Create Pipefy card
+        pipefy_content = {
+            'api_token': st.secrets["pipefy"]["api_token"],
+            'pipe_id': '305477886',
+            'title': f"Agendamento: {new_schedule['ID']}",
+            'fields': {
+                "fornecedor": supplier_name,
+                "data_do_agendamento": str(dropoff_date),
+                "hub": "HUB",
+                "cd": "CD",
+                "centro_de_distribui_o": distribution_center,
+                "fornecedor_paletizado": "Yes" if pallet_number > 0 else "No",
+                "se_sim_informe_a_quantidade_de_paletes": str(pallet_number),
+                "toneladas": str(total_weight),
+                "exige_cobran_a_de_descarga": "No",
+                "foi_agendado": status,
+                "observa_es_1": "Nenhuma observação",
+                "id": new_schedule["ID"]
+            }
+        }
+
+        pipefy_result = create_pipefy_card(pipefy_content)
+
+        if pipefy_result["success"]:
+            st.success(f"Card criado no Pipefy com sucesso! ID: {pipefy_result['card_id']}, Título: {pipefy_result['card_title']}")
+        else:
+            st.error(f"Erro ao criar o card no Pipefy: {pipefy_result['error']}")
